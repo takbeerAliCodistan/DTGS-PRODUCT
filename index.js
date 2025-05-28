@@ -72,7 +72,7 @@ async function checkNews() {
       return true; // new content found
     }
     console.log("✅ No new news found.");
-    console.log("testing")
+   
     return false;
   } catch (error) {
     console.error("❌ Error checking news:", error.message);
