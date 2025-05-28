@@ -1,9 +1,7 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
-const nodemailer = require("nodemailer");
-const cron = require("node-cron");
-const https = require("follow-redirects").https;
 const fs = require("fs");
+const cron = require("node-cron");
 
 const twilio = require("twilio");
 
@@ -11,10 +9,7 @@ const accountSid = "AC3ad06204dcd3374f8d4e2a943ad292b1";
 const authToken = "86ea2c1922ff90406ef01d3258792a9a";
 const twilioClient = twilio(accountSid, authToken);
 
-// Your Twilio phone number (must be Twilio verified)
-const fromNumber = "+12524276581"; // Replace with your Twilio number including country code
-
-// Your personal phone number to receive SMS (include country code +92)
+const fromNumber = "+12524276581";
 const toNumberSMS = "+923369594783";
 
 async function sendSMS(message) {
@@ -30,194 +25,118 @@ async function sendSMS(message) {
   }
 }
 
-// URL of the news page
-const URL = "https://ambislamabad.esteri.it/en/news/";
+// Files to store last seen titles
+const LAST_NEWS_TITLE_FILE = "lastNewsTitle.txt";
+const LAST_ANNOUNCE_TITLE_FILE = "lastAnnouncementTitle.txt";
 
-// File to store the last seen news title
-const LAST_TITLE_FILE = "lastTitle.txt";
+// URLs
+const NEWS_URL = "https://ambislamabad.esteri.it/en/news/";
+const ANNOUNCEMENT_URL = "https://theitalyvisa.com/page/announcement";
 
-// function makeCallWithInfobip(textMessage) {
-//   const options = {
-//     method: 'POST',
-//     hostname: INFOBIP_BASE_URL,
-//     path: '/tts/3/advanced',
-//     headers: {
-//       Authorization: INFOBIP_API_KEY,
-//       'Content-Type': 'application/json',
-//       Accept: 'application/json'
-//     },
-//     maxRedirects: 20
-//   };
-
-//   const req = https.request(options, res => {
-//     let chunks = [];
-
-//     res.on('data', chunk => chunks.push(chunk));
-//     res.on('end', () => {
-//       const body = Buffer.concat(chunks);
-//       console.log('📞 Infobip response:', body.toString());
-//     });
-//     res.on('error', error => console.error('❌ Infobip error:', error));
-//   });
-
-//   const postData = JSON.stringify({
-//     messages: [
-//       {
-//         destinations: [{ to: TO_NUMBER }],
-//         from: '38515507799', // Your Infobip sender number (optional)
-//         language: 'en',
-//         text: textMessage,
-//         voice: {
-//           name: 'Joanna',
-//           gender: 'female'
-//         }
-//       }
-//     ]
-//   });
-
-//   req.write(postData);
-//   req.end();
-// }
-
-// Email configuration (uncomment if needed)
-/*
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "your.email@gmail.com",
-    pass: "your_app_password",
-  },
-});
-*/
-
-// Function to read the last seen title from file
-function readLastTitle() {
+// Read/write helpers
+function readLastTitle(file) {
   try {
-    return fs.readFileSync(LAST_TITLE_FILE, "utf8");
+    return fs.readFileSync(file, "utf8");
   } catch (err) {
     return "";
   }
 }
 
-// Function to write the last seen title to file
-function writeLastTitle(title) {
-  fs.writeFileSync(LAST_TITLE_FILE, title);
+function writeLastTitle(file, title) {
+  fs.writeFileSync(file, title);
 }
 
-// Function to check for new news
-// async function checkForNews() {
-//   try {
-//     const response = await axios.get(URL);
-//     const $ = cheerio.load(response.data);
-
-//     // ✅ Updated selectors based on actual page structure
-//     const latestNewsElement = $("article").first();
-//     const latestNewsTitle = latestNewsElement.find("h3").text().trim();
-//     const latestNewsLink = latestNewsElement.find("a").attr("href");
-
-//     const lastTitle = readLastTitle();
-
-//     if (latestNewsTitle && latestNewsTitle !== lastTitle) {
-//       console.log(`🆕 New News Found: "${latestNewsTitle}"`);
-//       console.log(`🔗 Link: https://ambislamabad.esteri.it${latestNewsLink}`);
-
-//       // Uncomment to send email
-//       /*
-//       await transporter.sendMail({
-//         from: '"Embassy News Bot" <your.email@gmail.com>',
-//         to: "your.email@gmail.com",
-//         subject: "New Embassy News Posted",
-//         text: `A new news item has been posted: "${latestNewsTitle}".\nRead more at: https://ambislamabad.esteri.it${latestNewsLink}`,
-//       });
-//       */
-
-//       // await client.calls.create({
-//       //   to: toNumber,
-//       //   from: fromNumber,
-//       //   url: "http://demo.twilio.com/docs/voice.xml",
-//       //   timeout: 10,
-//       // });
-//       await sendSMS(
-//         `New Embassy News: "${latestNewsTitle}". Read more at: https://ambislamabad.esteri.it${latestNewsLink}`
-//       );
-
-//       console.log("📞 Call placed to notify about new news.");
-
-//       // Update saved title
-//       writeLastTitle(latestNewsTitle);
-//     } else {
-//       // makeCallWithInfobip("A new news item has been posted. Please check the website.");
-
-//       // console.log('response...', r)
-//       console.log("✅ No new news.");
-//     }
-//   } catch (error) {
-//     console.error("❌ Error fetching the news page:", error.message);
-//   }
-// }
-
-async function checkForNews() {
+// Check news site for updates
+async function checkNews() {
   try {
-    const response = await axios.get('https://khanbbbb.blogspot.com/');
+    const response = await axios.get(NEWS_URL);
     const $ = cheerio.load(response.data);
 
-    // Select first blog post container (update selector if needed)
-    const latestPost = $('div.post').first();
+    const latestNewsElement = $("article").first();
+    const latestTitle = latestNewsElement.find("h3").text().trim();
+    const latestLink = latestNewsElement.find("a").attr("href");
+    const fullLink = `https://ambislamabad.esteri.it${latestLink}`;
 
-    // Get the title text
-    const latestPostTitle = latestPost.find('h3.post-title a').text().trim();
+    const lastTitle = readLastTitle(LAST_NEWS_TITLE_FILE);
 
-    // Get the post URL (href of the link inside title)
-    const latestPostLink = latestPost.find('h3.post-title a').attr('href');
+    if (latestTitle && latestTitle !== lastTitle) {
+      console.log(`🆕 New News Found: "${latestTitle}"`);
+      console.log(`🔗 Link: ${fullLink}`);
 
-    const lastTitle = readLastTitle();
+      for (let i = 0; i < 10; i++) {
+        console.log("send message number news", i + 1);
+        // await sendSMS(`New News: "${latestTitle}". Read more at: ${fullLink}`);
+      }
 
-    if (latestPostTitle && latestPostTitle !== lastTitle) {
-      console.log(`🆕 New Blog Post Detected: "${latestPostTitle}"`);
-      console.log(`🔗 Link: ${latestPostLink}`);
-
-      await sendSMS(
-        `New Blog Post: "${latestPostTitle}". Read more at: ${latestPostLink}`
-      );
-
-      // Update last seen title
-      writeLastTitle(latestPostTitle);
-    } else {
-      console.log("✅ No new blog post.");
+      writeLastTitle(LAST_NEWS_TITLE_FILE, latestTitle);
+      return true; // new content found
     }
+    console.log("✅ No new news found.");
+    return false;
   } catch (error) {
-    console.error("❌ Error fetching blog page:", error.message);
+    console.error("❌ Error checking news:", error.message);
+    return false;
   }
 }
 
-
-async function getLatestNews() {
+// Check announcement site for updates
+async function checkAnnouncements() {
   try {
-    const response = await axios.get(URL);
+    const response = await axios.get(ANNOUNCEMENT_URL);
     const $ = cheerio.load(response.data);
 
-    // Get the first article block (most recent)
-    const latestArticle = $("article").first();
+    // Based on your screenshot and previous page structure:
+    // Announcements are links under <div> with class or inside the page body
+    // We'll target the first announcement link text and href
 
-    const title = latestArticle.find("h3").text().trim();
-    const date = latestArticle.find("div[class*=news-date]").text().trim();
-    const relativeLink = latestArticle.find("a").attr("href");
-    const fullLink = `https://ambislamabad.esteri.it${relativeLink}`;
-    const description = latestArticle.find("p").text().trim();
+    // Find first announcement link text and href - update selector if needed
+    const firstAnnouncement = $("a")
+      .filter(function () {
+        return $(this).parent().text().includes("Announcement");
+      })
+      .first();
 
-    console.log("📰 Latest News Post:");
-    console.log(`📅 Date: ${date}`);
-    console.log(`📝 Title: ${title}`);
-    console.log(`🔗 Link: ${fullLink}`);
-    console.log(`🧾 Description: ${description}`);
-  } catch (err) {
-    console.error("❌ Failed to fetch latest news:", err.message);
+    const latestTitle = firstAnnouncement.text().trim();
+    const latestLink = firstAnnouncement.attr("href");
+
+    const lastTitle = readLastTitle(LAST_ANNOUNCE_TITLE_FILE);
+
+    if (latestTitle && latestTitle !== lastTitle) {
+      console.log(`🆕 New Announcement Found: "${latestTitle}"`);
+      console.log(`🔗 Link: ${latestLink}`);
+
+      for (let i = 0; i < 10; i++) {
+        console.log("send message number announcment", i + 1);
+        await sendSMS(
+          `New Announcement: "${latestTitle}". Check here: ${latestLink}`
+        );
+      }
+
+      writeLastTitle(LAST_ANNOUNCE_TITLE_FILE, latestTitle);
+      return true;
+    }
+    console.log("✅ No new announcements found.");
+    return false;
+  } catch (error) {
+    console.error("❌ Error checking announcements:", error.message);
+    return false;
   }
 }
 
-// Run every 10 minutes
-cron.schedule("*/10 * * * * *", () => {
-  console.log("🔍 Checking for news update...");
-  checkForNews();
-  // getLatestNews();
+// Main check function to check both sites
+async function checkBothSites() {
+  console.log("🔍 Checking news and announcements for updates...");
+
+  const newsUpdated = await checkNews();
+  const announcementsUpdated = await checkAnnouncements();
+
+  if (!newsUpdated && !announcementsUpdated) {
+    console.log("✅ No new updates on either site.");
+  }
+}
+
+// Example: run every 10 minutes
+
+cron.schedule("*/5 * * * * *", () => {
+  checkBothSites();
 });
