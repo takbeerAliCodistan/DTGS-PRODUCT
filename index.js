@@ -138,6 +138,7 @@ async function checkBothSites() {
 
 // Example: run every 10 minutes
 
-cron.schedule("*/5 * * * * *", () => {
+cron.schedule("*/1 * * * *", () => {
   checkBothSites();
 });
+
