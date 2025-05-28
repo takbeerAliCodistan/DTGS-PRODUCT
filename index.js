@@ -65,7 +65,7 @@ async function checkNews() {
 
       for (let i = 0; i < 10; i++) {
         console.log("send message number news", i + 1);
-        // await sendSMS(`New News: "${latestTitle}". Read more at: ${fullLink}`);
+        await sendSMS(`New News: "${latestTitle}". Read more at: ${fullLink}`);
       }
 
       writeLastTitle(LAST_NEWS_TITLE_FILE, latestTitle);
