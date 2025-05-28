@@ -8,7 +8,7 @@ const fs = require("fs");
 const twilio = require("twilio");
 
 const accountSid = "AC3ad06204dcd3374f8d4e2a943ad292b1";
-const authToken = "c8c38d3b1066ca2b82a15662d02afe83";
+const authToken = "86ea2c1922ff90406ef01d3258792a9a";
 const twilioClient = twilio(accountSid, authToken);
 
 // Your Twilio phone number (must be Twilio verified)
